@@ -2,6 +2,7 @@
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
 
+// https://stackoverflow.com/questions/3568513/how-to-create-keyboard-shortcut-in-windows-that-call-function-in-my-app
 public class HotKeyManager
 {
     public static event EventHandler<HotKeyEventArgs> HotKeyPressed;

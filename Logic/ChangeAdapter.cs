@@ -19,8 +19,8 @@ namespace LyncTracker.Logic
         public ChangeAdapter(MainForm mf)
         {
             this._mf = mf;
+            SendStatusChange("Started", "", "", ContactAvailability.None, new DateTime(), DateTime.Now);
         }
-
 
         private void ChangeImage(string email, ContactAvailability status)
         {
@@ -32,6 +32,8 @@ namespace LyncTracker.Logic
             else
             {
                 ListViewItem lvi = _mf.lvList.FindItemWithText(email);
+                if (lvi == null) // requested email not found - typically: "Started" specific case
+                    return;
 
                 switch (status)
                 {

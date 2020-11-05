@@ -27,6 +27,7 @@ namespace LyncTracker
             InitializeImageList();
             InitializeGroups();
             InitializeCheckList();
+            initializeMailList();
             this.Opacity = 0;
             this.Shown += MainForm_Shown;
         }
