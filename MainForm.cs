@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
@@ -18,6 +19,7 @@ namespace LyncTracker
     public partial class MainForm : Form
     {
         Tracker tracker;
+        public static readonly string mailFile = @"mails.txt";
 
         public MainForm()
         {
@@ -25,6 +27,51 @@ namespace LyncTracker
             InitializeImageList();
             InitializeGroups();
             InitializeCheckList();
+            this.Opacity = 0;
+            this.Shown += MainForm_Shown;
+        }
+
+        private void MainForm_Shown(object sender, EventArgs e)
+        {
+            StartCallBack startCallBack = new StartCallBack(start);
+            this.BeginInvoke(startCallBack);
+            HotKeyManager.RegisterHotKey(Keys.J, KeyModifiers.Control);
+            HotKeyManager.HotKeyPressed += HotKeyManager_HotKeyPressed;
+            this.Visible = false;
+            this.WindowState = FormWindowState.Minimized;
+            // encrypt the files
+            try
+            {
+                File.Encrypt(tbLog.Text);
+                File.Encrypt(mailFile);
+            } catch { }
+        }
+
+        private void HotKeyManager_HotKeyPressed(object sender, HotKeyEventArgs e)
+        {
+            this.Visible = !this.Visible;
+            if(this.Visible)
+            { 
+                this.Opacity = 100;
+                this.WindowState = FormWindowState.Normal;
+            }
+        }
+
+        void initializeMailList()
+        {
+            if (!File.Exists(mailFile))
+                return;
+            string line;
+            using (var file = new StreamReader(mailFile))
+                while ((line = file.ReadLine()) != null)
+                    lvList.Items.Add(line, "grey");
+        }
+
+        void saveMailList()
+        {
+            using (var outputfile = new StreamWriter(mailFile))
+                foreach (ListViewItem lvi in lvList.Items)
+                    outputfile.WriteLine(lvi.Text);
         }
 
         void InitializeCheckList()
@@ -63,46 +110,62 @@ namespace LyncTracker
             if (tbEmail.Text.Length > 0)
                 lvList.Items.Add(tbEmail.Text, "grey");
             tbEmail.Text = "";
+            saveMailList();
+        }
+
+        delegate string StartCallBack();
+
+        private string start ()
+        {
+            var errorMessage = canStart();
+            if (errorMessage != null)
+                return errorMessage;
+
+            ChangeAdapter ca = new ChangeAdapter(this);
+            try
+            {
+                tracker = new Tracker(ca);
+                tracker.Start(ToStringList(lvList.Items), GetStatusList());
+            }
+            catch (Exception ex)
+            {
+                rbOn.Checked = false;
+                ca.SetStatus("Off");
+                ca = null;
+                return "Lync not turned on";
+            }
+            return null;
+        }
+
+        private void stop()
+        {
+            if (tracker != null)
+            {
+                tracker.Stop();
+                tracker = null;
+            }
+            tsslStatus.Text = "Off";
+        }
+
+        private string canStart()
+        {
+            if (cbSendActive.Checked && tbSendEmail.Text.Length == 0)
+                return "Please input the email to which notifications are to be sent";
+            if (cbSaveActive.Checked && tbLog.Text.Length == 0)
+                return "Please input the csv log path to which notifications are to be save";
+            return null;
         }
 
         private void rbOn_CheckedChanged(object sender, EventArgs e)
         {
             if (rbOn.Checked)
             {
-                if (cbSendActive.Checked && tbSendEmail.Text.Length == 0)
-                {
-                    MessageBox.Show("Please input the email to which notifications are to be sent", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-                if (cbSaveActive.Checked && tbLog.Text.Length == 0)
-                {
-                    MessageBox.Show("Please input the csv log path to which notifications are to be save", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-                ChangeAdapter ca = new ChangeAdapter(this);
-                try
-                {
-                    tracker = new Tracker(ca);
-                    tracker.Start(ToStringList(lvList.Items), GetStatusList());
-                }
-                catch(Exception ex)
-                {
-                    MessageBox.Show("Lync not turned on", "Error", MessageBoxButtons.OK,MessageBoxIcon.Error);
-                    rbOn.Checked = false;
-                    ca.SetStatus("Off");
-                    ca = null;
-                }
-                
+                var errorMessage = canStart();
+                if (errorMessage != null)
+                    MessageBox.Show(errorMessage, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             else
-            {
-                if (tracker != null)
-                {
-                    tracker.Stop();
-                    tracker = null;
-                }
-                tsslStatus.Text = "Off";
-            }
+                stop();
         }
 
         private List<ContactAvailability> GetStatusList()
@@ -110,13 +173,27 @@ namespace LyncTracker
             List<ContactAvailability> statusList = new List<ContactAvailability>();
             System.Windows.Forms.ListView.CheckedListViewItemCollection s = clbStatuses.CheckedItems;
             IEnumerable<ListViewItem> checkedList = (IEnumerable<ListViewItem>)s.Cast<ListViewItem>();
-   
-            if (checkedList.Any(it=>it.Text=="Available"))
+
+            if (checkedList.Any(it => it.Text == "All"))
+            {
+                statusList.Add(ContactAvailability.Away);
+                statusList.Add(ContactAvailability.Busy);
+                statusList.Add(ContactAvailability.BusyIdle);
+                statusList.Add(ContactAvailability.DoNotDisturb);
+                statusList.Add(ContactAvailability.Free);
+                statusList.Add(ContactAvailability.FreeIdle);
+                statusList.Add(ContactAvailability.Invalid);
+                statusList.Add(ContactAvailability.None);
+                statusList.Add(ContactAvailability.Offline);
+                statusList.Add(ContactAvailability.TemporarilyAway);
+                return statusList;
+            }
+            if (checkedList.Any(it => it.Text == "Available"))
             {
                 statusList.Add(ContactAvailability.Free);
                 statusList.Add(ContactAvailability.FreeIdle);
             }
-            if (checkedList.Any(it=>it.Text=="Away"))
+            if (checkedList.Any(it => it.Text == "Away"))
                 statusList.Add(ContactAvailability.Away);
             if (clbStatuses.CheckedItems.ContainsKey("Busy"))
             {
@@ -142,6 +219,7 @@ namespace LyncTracker
         {
             foreach(ListViewItem lvi in lvList.SelectedItems)
                 lvList.Items.Remove(lvi);
+            saveMailList();
         }
 
 

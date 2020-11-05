@@ -8,7 +8,7 @@ namespace LyncTracker.Logic
 {
     interface ChangeInterface
     {
-        void SendStatusChange(string email, string lastName, string firstName, ContactAvailability status, DateTime date);
+        void SendStatusChange(string email, string lastName, string firstName, ContactAvailability status, DateTime idleStartTime, DateTime date);
 
         void SendStatusChange(string email, ContactAvailability status);
 

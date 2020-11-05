@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -27,21 +28,16 @@ namespace LyncTracker.Logic
     
         }
 
-        void Callback(IAsyncResult ar)
+        void Callback(IAsyncResult ar, string requestedEmail)
         {
-            int x = 1;
             try
             {
-                
                 Automation _Automation = LyncClient.GetAutomation();
-                
-
                 SearchResults sr = _lc.ContactManager.EndSearch(ar);
                 Contact c = sr.Contacts.First();
                 _cList.Add(c);
-                c.ContactInformationChanged+= c_ContactInformationChanged;
-                ContactAvailability availEnum = (ContactAvailability)c.GetContactInformation(ContactInformationType.Availability);
-                _cn.SendStatusChange((string)((List<object>)c.GetContactInformation(ContactInformationType.EmailAddresses)).First(), availEnum);
+                c.ContactInformationChanged += (object sender, ContactInformationChangedEventArgs eventArgs) => c_ContactInformationChanged (sender, eventArgs, requestedEmail);
+                getContactInfoAndNotify(c, requestedEmail);
             }
             catch
             {
@@ -93,40 +89,43 @@ namespace LyncTracker.Logic
             //MessageBox.Show("Received");
         }
 
-        void c_ContactInformationChanged(object sender, ContactInformationChangedEventArgs e)
+        object getContactProperyNoThrow(Contact contact, ContactInformationType infoType)
+        {
+            object obj = null;
+            try { obj = contact.GetContactInformation(infoType); }
+            catch (COMException ex) { Console.WriteLine(ex.Message); }
+            catch (ItemNotFoundException ex) { Console.WriteLine(ex.Message); }
+            catch (Exception ex) { Console.WriteLine(ex.Message); }
+            return obj;
+        }
+
+        void getContactInfoAndNotify(Contact contact, string requestedEmail)
+        {
+            ContactAvailability availEnum = (ContactAvailability)getContactProperyNoThrow(contact, ContactInformationType.Availability);
+            if (!CheckStatus(availEnum))
+                return;
+
+            var activityString = getContactProperyNoThrow(contact, ContactInformationType.Activity);
+            var customActivity = getContactProperyNoThrow(contact, ContactInformationType.CustomActivity);
+            var locName = getContactProperyNoThrow(contact, ContactInformationType.LocationName);
+            var title = getContactProperyNoThrow(contact, ContactInformationType.Title);
+            var calState = getContactProperyNoThrow(contact, ContactInformationType.CurrentCalendarState);
+            var timeZone = getContactProperyNoThrow(contact, ContactInformationType.TimeZone);
+            var availID = getContactProperyNoThrow(contact, ContactInformationType.ActivityId);
+
+            // to avoid having to look through the list of emails to find the one we are interested in, we'll just used the email saved in the callback
+            var listEmails = (List<object>)getContactProperyNoThrow(contact, ContactInformationType.EmailAddresses);
+            var idleStartTimeObj = getContactProperyNoThrow(contact, ContactInformationType.IdleStartTime);
+            var idleStartTime = idleStartTimeObj == null ? new DateTime() : (DateTime)idleStartTimeObj;
+            var lastName = (string)getContactProperyNoThrow(contact, ContactInformationType.LastName);
+            var firstName = (string)getContactProperyNoThrow(contact, ContactInformationType.FirstName);
+            _cn.SendStatusChange(requestedEmail, lastName, firstName, availEnum, idleStartTime, DateTime.Now.ToLocalTime());
+        }
+
+        void c_ContactInformationChanged(object sender, ContactInformationChangedEventArgs e, string requestedEmail)
         {
             if (e.ChangedContactInformation.Contains(ContactInformationType.Availability))
-            {
-                try
-                {
-
-                    ContactAvailability availEnum = (ContactAvailability)((Contact)sender).GetContactInformation(ContactInformationType.Availability);
-                    if (!CheckStatus(availEnum)) return;
-                    string activityString = (string)((Contact)sender).GetContactInformation(ContactInformationType.Activity);
-                    //var availability = ((Contact)sender).GetContactInformation(ContactInformationType.Availability);
-                    var customActivity = ((Contact)sender).GetContactInformation(ContactInformationType.CustomActivity);
-                    var locName = ((Contact)sender).GetContactInformation(ContactInformationType.LocationName);
-                    var title = ((Contact)sender).GetContactInformation(ContactInformationType.Title);
-                    var defNote = ((Contact)sender).GetContactInformation(ContactInformationType.DefaultNote);
-                    var desc = ((Contact)sender).GetContactInformation(ContactInformationType.Description);
-                    var actId = ((Contact)sender).GetContactInformation(ContactInformationType.ActivityId);
-                    var cap = ((Contact)sender).GetContactInformation(ContactInformationType.Capabilities);
-                    var capStr = ((Contact)sender).GetContactInformation(ContactInformationType.CapabilityString);
-                    var calState = ((Contact)sender).GetContactInformation(ContactInformationType.CurrentCalendarState);
-                    var idleStartTime = ((Contact)sender).GetContactInformation(ContactInformationType.IdleStartTime);
-                    var nextCalStartTime = ((Contact)sender).GetContactInformation(ContactInformationType.NextCalendarStateStartTime);
-                    var timeZone = ((Contact)sender).GetContactInformation(ContactInformationType.TimeZone);
-                    var availID = ((Contact)sender).GetContactInformation(ContactInformationType.ActivityId);
-
-                    Contact c = ((Contact)sender);
-                    List<object> list = (List<object>)(((Contact)sender).GetContactInformation(ContactInformationType.EmailAddresses));
-                    _cn.SendStatusChange((string)list.First(), ((string)c.GetContactInformation(ContactInformationType.LastName)),
-                                        ((string)c.GetContactInformation(ContactInformationType.FirstName)),
-                                        availEnum, DateTime.Now.ToLocalTime());
-                }
-                catch { }
-            }
-            
+                getContactInfoAndNotify((Contact)sender, requestedEmail);
         }
 
         private bool CheckStatus(ContactAvailability availEnum)
@@ -142,19 +141,18 @@ namespace LyncTracker.Logic
         public void Start(List<string> sList, List<ContactAvailability> statusList)
         {
             _statusList = statusList;
-            foreach (string s in sList)
+            foreach (string requestedEmail in sList)
             {
-                IAsyncResult ar = _lc.ContactManager.BeginSearch(s, Callback, null);
+                IAsyncResult ar = _lc.ContactManager.BeginSearch(requestedEmail, (IAsyncResult ar_) => Callback(ar_, requestedEmail), null);
             }
             _cn.SetStatus("On");
         }
 
         public void Stop()
         {
-            foreach (Contact c in _cList)
-            {
-                c.ContactInformationChanged -= c_ContactInformationChanged;
-            }
+            foreach (Contact c in _cList) ;
+                // not sure how to remove the anonymous delegate created to store the requested email
+                // c.ContactInformationChanged -= c_ContactInformationChanged;
         }
     }
 }

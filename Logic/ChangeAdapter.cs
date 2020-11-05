@@ -10,8 +10,8 @@ namespace LyncTracker.Logic
 {
     class ChangeAdapter:ChangeInterface
     {
-
-        string firstRow = "Firstname,LastName,Status,ChangeDate";
+        char separator = ';';
+        string firstRow = "Firstname;LastName;Status;IdleStartTime;ChangeDate";
         MainForm _mf;
 
         delegate void ImageCallBack(string email, ContactAvailability status);
@@ -63,13 +63,13 @@ namespace LyncTracker.Logic
             ChangeImage(email, status);
         }
 
-        public void SendStatusChange(string email, string firstName, string lastName, ContactAvailability status, DateTime date)
+        public void SendStatusChange(string email, string firstName, string lastName, ContactAvailability status, DateTime idleStartTime, DateTime date)
         {
             _mf.tsslChange.Text = "Changed " + date.ToLocalTime();
             if (_mf.cbSaveActive.Checked)
             {
                 CSVManager m = new CSVManager(_mf.tbLog.Text, firstRow);
-                m.WriteLine(firstName + "," + lastName + "," + status + "," + date.ToLocalTime());
+                m.WriteLine(firstName + separator + lastName + separator + status + separator + idleStartTime.ToLocalTime() + separator + date.ToLocalTime());
             }
             if (_mf.cbSendActive.Checked)
             {
