@@ -111,15 +111,15 @@ namespace LyncTracker.Logic
             var title = getContactProperyNoThrow(contact, ContactInformationType.Title);
             var calState = getContactProperyNoThrow(contact, ContactInformationType.CurrentCalendarState);
             var timeZone = getContactProperyNoThrow(contact, ContactInformationType.TimeZone);
-            var availID = getContactProperyNoThrow(contact, ContactInformationType.ActivityId);
+            var activityId = (string) getContactProperyNoThrow(contact, ContactInformationType.ActivityId) ?? "";
 
             // to avoid having to look through the list of emails to find the one we are interested in, we'll just used the email saved in the callback
             var listEmails = (List<object>)getContactProperyNoThrow(contact, ContactInformationType.EmailAddresses);
             var idleStartTimeObj = getContactProperyNoThrow(contact, ContactInformationType.IdleStartTime);
             var idleStartTime = idleStartTimeObj == null ? new DateTime() : (DateTime)idleStartTimeObj;
-            var lastName = (string)getContactProperyNoThrow(contact, ContactInformationType.LastName);
-            var firstName = (string)getContactProperyNoThrow(contact, ContactInformationType.FirstName);
-            _cn.SendStatusChange(requestedEmail, lastName, firstName, availEnum, idleStartTime, DateTime.Now.ToLocalTime());
+            var lastName = (string)getContactProperyNoThrow(contact, ContactInformationType.LastName) ?? "";
+            var firstName = (string)getContactProperyNoThrow(contact, ContactInformationType.FirstName) ?? "";
+            _cn.SendStatusChange(requestedEmail, lastName, firstName, availEnum, idleStartTime, DateTime.Now.ToLocalTime(), activityId);
         }
 
         void c_ContactInformationChanged(object sender, ContactInformationChangedEventArgs e, string requestedEmail)

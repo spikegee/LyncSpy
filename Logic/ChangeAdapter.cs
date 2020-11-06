@@ -11,7 +11,7 @@ namespace LyncTracker.Logic
     class ChangeAdapter:ChangeInterface
     {
         char separator = ';';
-        string firstRow = "Firstname;LastName;Status;IdleStartTime;ChangeDate";
+        string firstRow = "Firstname;LastName;Status;IdleStartTime;ChangeDate;ActivityId";
         MainForm _mf;
 
         delegate void ImageCallBack(string email, ContactAvailability status);
@@ -19,7 +19,7 @@ namespace LyncTracker.Logic
         public ChangeAdapter(MainForm mf)
         {
             this._mf = mf;
-            SendStatusChange("Started", "", "", ContactAvailability.None, new DateTime(), DateTime.Now);
+            SendStatusChange("Started", "", "", ContactAvailability.None, new DateTime(), DateTime.Now, "");
         }
 
         private void ChangeImage(string email, ContactAvailability status)
@@ -65,13 +65,13 @@ namespace LyncTracker.Logic
             ChangeImage(email, status);
         }
 
-        public void SendStatusChange(string email, string firstName, string lastName, ContactAvailability status, DateTime idleStartTime, DateTime date)
+        public void SendStatusChange(string email, string firstName, string lastName, ContactAvailability status, DateTime idleStartTime, DateTime date, string activityId)
         {
             _mf.tsslChange.Text = "Changed " + date.ToLocalTime();
             if (_mf.cbSaveActive.Checked)
             {
                 CSVManager m = new CSVManager(_mf.tbLog.Text, firstRow);
-                m.WriteLine(firstName + separator + lastName + separator + status + separator + idleStartTime.ToLocalTime() + separator + date.ToLocalTime());
+                m.WriteLine(firstName + separator + lastName + separator + status + separator + idleStartTime.ToLocalTime() + separator + date.ToLocalTime() + separator + activityId);
             }
             if (_mf.cbSendActive.Checked)
             {
